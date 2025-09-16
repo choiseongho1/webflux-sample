@@ -1,0 +1,10 @@
+-- 기존 테이블이 있다면 삭제
+DROP TABLE IF EXISTS users;
+
+-- 사용자 테이블 생성
+CREATE TABLE users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);

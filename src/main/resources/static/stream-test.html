@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebFlux 스트리밍 테스트</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        h1 {
+            color: #333;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 10px;
+        }
+        .card {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #444;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        .output {
+            border: 1px solid #ddd;
+            padding: 10px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+        .user-item {
+            margin-bottom: 5px;
+            padding: 5px;
+            border-bottom: 1px solid #eee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WebFlux 스트리밍 테스트</h1>
+        
+        <div class="card">
+            <h2>1. 사용자 데이터 스트리밍 (SSE)</h2>
+            <p>Server-Sent Events를 통해 사용자 데이터를 스트리밍 방식으로 받아옵니다.</p>
+            <button id="streamUsers">사용자 스트리밍 시작</button>
+            <button id="stopStreamUsers" disabled>중지</button>
+            <div id="userOutput" class="output"></div>
+        </div>
+        
+        <div class="card">
+            <h2>2. 시간 정보 무한 스트리밍</h2>
+            <p>서버에서 1초마다 현재 시간을 스트리밍합니다.</p>
+            <button id="streamTime">시간 스트리밍 시작</button>
+            <button id="stopStreamTime" disabled>중지</button>
+            <div id="timeOutput" class="output"></div>
+        </div>
+        
+        <div class="card">
+            <h2>3. 사용자 데이터 청크 스트리밍</h2>
+            <p>사용자 데이터를 10명씩 그룹화하여 청크 단위로 스트리밍합니다.</p>
+            <button id="streamChunks">청크 스트리밍 시작</button>
+            <button id="stopStreamChunks" disabled>중지</button>
+            <div id="chunkOutput" class="output"></div>
+        </div>
+    </div>
+
+    <script>
+        let userEventSource = null;
+        let timeEventSource = null;
+        let chunkEventSource = null;
+        
+        // 사용자 데이터 스트리밍
+        document.getElementById('streamUsers').addEventListener('click', function() {
+            const output = document.getElementById('userOutput');
+            output.innerHTML = '<div class="loading">연결 중...</div>';
+            
+            userEventSource = new EventSource('/api/stream/users');
+            
+            userEventSource.onopen = function() {
+                output.innerHTML = '';
+                document.getElementById('streamUsers').disabled = true;
+                document.getElementById('stopStreamUsers').disabled = false;
+            };
+            
+            userEventSource.onmessage = function(event) {
+                const user = JSON.parse(event.data);
+                const userDiv = document.createElement('div');
+                userDiv.className = 'user-item';
+                userDiv.innerHTML = `ID: ${user.id}, 이름: ${user.name}, 이메일: ${user.email}`;
+                output.appendChild(userDiv);
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            userEventSource.onerror = function() {
+                output.innerHTML += '<div style="color: red;">연결 오류 발생</div>';
+                userEventSource.close();
+                document.getElementById('streamUsers').disabled = false;
+                document.getElementById('stopStreamUsers').disabled = true;
+            };
+        });
+        
+        document.getElementById('stopStreamUsers').addEventListener('click', function() {
+            if (userEventSource) {
+                userEventSource.close();
+                document.getElementById('userOutput').innerHTML += '<div>스트리밍 중지됨</div>';
+                document.getElementById('streamUsers').disabled = false;
+                document.getElementById('stopStreamUsers').disabled = true;
+            }
+        });
+        
+        // 시간 정보 스트리밍
+        document.getElementById('streamTime').addEventListener('click', function() {
+            const output = document.getElementById('timeOutput');
+            output.innerHTML = '<div class="loading">연결 중...</div>';
+            
+            timeEventSource = new EventSource('/api/stream/time');
+            
+            timeEventSource.onopen = function() {
+                output.innerHTML = '';
+                document.getElementById('streamTime').disabled = true;
+                document.getElementById('stopStreamTime').disabled = false;
+            };
+            
+            timeEventSource.onmessage = function(event) {
+                const timeDiv = document.createElement('div');
+                timeDiv.innerHTML = `현재 시간: ${event.data}`;
+                output.appendChild(timeDiv);
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            timeEventSource.onerror = function() {
+                output.innerHTML += '<div style="color: red;">연결 오류 발생</div>';
+                timeEventSource.close();
+                document.getElementById('streamTime').disabled = false;
+                document.getElementById('stopStreamTime').disabled = true;
+            };
+        });
+        
+        document.getElementById('stopStreamTime').addEventListener('click', function() {
+            if (timeEventSource) {
+                timeEventSource.close();
+                document.getElementById('timeOutput').innerHTML += '<div>스트리밍 중지됨</div>';
+                document.getElementById('streamTime').disabled = false;
+                document.getElementById('stopStreamTime').disabled = true;
+            }
+        });
+        
+        // 청크 스트리밍
+        document.getElementById('streamChunks').addEventListener('click', function() {
+            const output = document.getElementById('chunkOutput');
+            output.innerHTML = '<div class="loading">연결 중...</div>';
+            
+            chunkEventSource = new EventSource('/api/stream/users/chunked');
+            
+            chunkEventSource.onopen = function() {
+                output.innerHTML = '';
+                document.getElementById('streamChunks').disabled = true;
+                document.getElementById('stopStreamChunks').disabled = false;
+            };
+            
+            chunkEventSource.onmessage = function(event) {
+                const chunkDiv = document.createElement('div');
+                chunkDiv.innerHTML = event.data;
+                output.appendChild(chunkDiv);
+                output.scrollTop = output.scrollHeight;
+            };
+            
+            chunkEventSource.onerror = function() {
+                output.innerHTML += '<div style="color: red;">연결 오류 발생</div>';
+                chunkEventSource.close();
+                document.getElementById('streamChunks').disabled = false;
+                document.getElementById('stopStreamChunks').disabled = true;
+            };
+        });
+        
+        document.getElementById('stopStreamChunks').addEventListener('click', function() {
+            if (chunkEventSource) {
+                chunkEventSource.close();
+                document.getElementById('chunkOutput').innerHTML += '<div>스트리밍 중지됨</div>';
+                document.getElementById('streamChunks').disabled = false;
+                document.getElementById('stopStreamChunks').disabled = true;
+            }
+        });
+    </script>
+</body>
+</html>
